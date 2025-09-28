@@ -1,4 +1,4 @@
-package  com.tracking.domain;
+package com.tracking.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
@@ -8,9 +8,9 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Entity
 @Table(name = "users")
 public class User {
@@ -20,20 +20,20 @@ public class User {
     @Column(name = "user_Id")
     private Integer userId;
 
-    @Column(name = "username", nullable = false, unique = true, length = 50)
+    @Column(name = "username", nullable = false, unique = true, length = 50, columnDefinition = "NVARCHAR(50)")
     private String username;
 
     @JsonIgnore
-    @Column(name = "password", nullable = false)
+    @Column(name = "password", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String password;
 
-    @Column(name = "full_name", length = 100)
+    @Column(name = "full_name", length = 100, columnDefinition = "NVARCHAR(100)")
     private String fullName;
 
-    @Column(name = "email", unique = true, length = 100)
+    @Column(name = "email", unique = true, length = 100, columnDefinition = "NVARCHAR(100)")
     private String email;
 
-    @Column(name = "phone", length = 20)
+    @Column(name = "phone", length = 20, columnDefinition = "NVARCHAR(20)")
     private String phone;
 
     @ManyToOne(fetch = FetchType.LAZY)

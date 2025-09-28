@@ -19,10 +19,10 @@ public class IncidentDTO {
     private LocalDateTime updatedAt;
 
     private Integer createdById;
-    private String createdByName;
+    private String createdByFullName;
 
     private Integer assignedToId;
-    private String assignedToName;
+    private String assignedToFullName;
 
     private Integer categoryId;
     private String categoryName;

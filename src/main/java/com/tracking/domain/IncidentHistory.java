@@ -1,4 +1,4 @@
-package  com.tracking.domain;
+package com.tracking.domain;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "incident_history")
 public class IncidentHistory {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "history_Id")
@@ -22,7 +23,7 @@ public class IncidentHistory {
     @JoinColumn(name = "incident_Id", nullable = false)
     private Incident incident;
 
-    @Column(length = 50)
+    @Column(length = 50, columnDefinition = "NVARCHAR(50)")
     private String status;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -32,7 +33,7 @@ public class IncidentHistory {
     @Column(name = "changed_at")
     private LocalDateTime changedAt;
 
-    @Column(columnDefinition = "text")
+    @Column(columnDefinition = "NVARCHAR(MAX)")
     private String note;
 
     @PrePersist

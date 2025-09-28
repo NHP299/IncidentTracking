@@ -1,5 +1,4 @@
-package  com.tracking.domain;
-
+package com.tracking.domain;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -14,12 +13,13 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "reports")
 public class Report {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "report_Id")
     private Integer reportId;
 
-    @Column(nullable = false, length = 200)
+    @Column(nullable = false, length = 200, columnDefinition = "NVARCHAR(200)")
     private String title;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -29,7 +29,7 @@ public class Report {
     @Column(name = "generated_at")
     private LocalDateTime generatedAt;
 
-    @Column(name = "file_path", nullable = false)
+    @Column(name = "file_path", nullable = false, length = 500, columnDefinition = "NVARCHAR(500)")
     private String filePath;
 
     @PrePersist

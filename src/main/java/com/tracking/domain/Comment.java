@@ -1,10 +1,9 @@
-package  com.tracking.domain;
+package com.tracking.domain;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
 
 @AllArgsConstructor
@@ -13,6 +12,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "comments")
 public class Comment {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "comment_Id")
@@ -26,7 +26,7 @@ public class Comment {
     @JoinColumn(name = "user_Id", nullable = false)
     private User user;
 
-    @Column(columnDefinition = "text")
+    @Column(columnDefinition = "NVARCHAR(MAX)")
     private String content;
 
     @Column(name = "created_at")

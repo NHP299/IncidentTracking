@@ -14,6 +14,7 @@ public class CommentDTO {
     private Integer commentId;
     private Integer incidentId;
     private Integer userId;
+    private String userName;
     private String userFullName;
     private String content;
     private LocalDateTime createdAt;

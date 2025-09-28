@@ -1,4 +1,4 @@
-package  com.tracking.domain;
+package com.tracking.domain;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -13,12 +13,12 @@ import lombok.NoArgsConstructor;
 public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "role_Id")
+    @Column(name = "role_id")
     private Integer roleId;
 
-    @Column(name = "role_name", nullable = false, unique = true, length = 50)
+    @Column(name = "role_name", nullable = false, unique = true, length = 50, columnDefinition = "NVARCHAR(50)")
     private String roleName;
 
-    @Column(name = "description", length = 255)
+    @Column(name = "description", length = 255, columnDefinition = "NVARCHAR(255)")
     private String description;
 }

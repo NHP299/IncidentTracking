@@ -1,5 +1,4 @@
-package  com.tracking.domain;
-
+package com.tracking.domain;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -14,6 +13,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "notifications")
 public class Notification {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "notification_Id")
@@ -27,7 +27,7 @@ public class Notification {
     @JoinColumn(name = "incident_Id")
     private Incident incident;
 
-    @Column(columnDefinition = "text")
+    @Column(columnDefinition = "NVARCHAR(MAX)")
     private String message;
 
     @Column(name = "is_read")
