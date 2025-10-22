@@ -50,6 +50,9 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public void deleteRole(Integer id) {
         roleRepository.deleteById(id);
+        if (roleRepository.count() == 0) {
+            roleRepository.resetIdentity();
+        }
     }
 
     @Override

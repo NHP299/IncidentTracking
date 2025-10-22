@@ -8,8 +8,11 @@ import org.springframework.stereotype.Repository;
 
 import jakarta.transaction.Transactional;
 
+import java.util.Optional;
+
 @Repository
 public interface RoleRepository extends JpaRepository<Role, Integer> {
+    Optional<Role> findByRoleName(String roleName);
 
     @Modifying
     @Transactional

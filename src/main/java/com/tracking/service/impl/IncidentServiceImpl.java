@@ -47,5 +47,8 @@ public class IncidentServiceImpl implements IncidentService {
     @Override
     public void deleteIncident(Integer id) {
         incidentRepository.deleteById(id);
+        if (incidentRepository.count() == 0) {
+            incidentRepository.resetIdentity();
+        }
     }
 }
