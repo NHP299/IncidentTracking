@@ -4,28 +4,34 @@ import com.tracking.domain.Role;
 import com.tracking.domain.User;
 import com.tracking.repository.RoleRepository;
 import com.tracking.repository.UserRepository;
-import com.tracking.security.*;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 import lombok.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.*;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Optional;
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired private AuthenticationManager authenticationManager;
-    @Autowired private CustomUserDetailsService userDetailsService;
     @Autowired private UserRepository userRepository;
-    @Autowired private JwtUtil jwtUtil;
-    @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private RoleRepository roleRepository;
+    @Autowired private PasswordEncoder passwordEncoder;
 
+    private final String SECRET_KEY = "your-256-bit-secret-your-256-bit-secret"; // >=32 ký tự
+    private final long EXPIRATION_MS = 3600000; // 1 giờ
+
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+    }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody AuthRequest request) {
@@ -33,43 +39,68 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Username already exists");
         }
 
-        Role defaultRole = roleRepository.findByRoleName("USER")
-                .orElseThrow(() -> new RuntimeException("Role USER not found"));
+        String roleName = request.getRoleName() != null ? request.getRoleName() : "USER";
+
+        Role role = roleRepository.findByRoleName(roleName)
+                .orElseThrow(() -> new RuntimeException("Role " + roleName + " not found"));
 
         User newUser = new User();
         newUser.setUsername(request.getUsername());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
-        newUser.setRole(defaultRole);
+        newUser.setRole(role);
 
         userRepository.save(newUser);
-        return ResponseEntity.ok(" User registered successfully");
+        return ResponseEntity.ok("User registered successfully with role " + roleName);
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-        );
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-        String token = jwtUtil.generateToken(userDetails);
-        String role = userDetails.getAuthorities().stream()
-                .findFirst()
-                .map(Object::toString)
-                .orElse("USER"); // default nếu không có role nào
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+        }
 
-        return ResponseEntity.ok(new AuthResponse(token, userDetails.getUsername(), role));
+        String role = user.getRole() != null ? user.getRole().getRoleName() : "USER";
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("roles", Collections.singletonList(role));
+
+        String token = Jwts.builder()
+                .setClaims(claims)
+                .setSubject(user.getUsername())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+
+        AuthResponse response = new AuthResponse(token, user.getUsername(), role);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest req) {
-        Optional<User> userOpt = userRepository.findByUsername(req.getUsername());
-
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body(" User not found");
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest req,
+                                           @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token");
         }
 
-        User user = userOpt.get();
+        String token = authHeader.substring(7);
+        String username;
+        try {
+            username = Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getSubject();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!passwordEncoder.matches(req.getOldPassword(), user.getPassword())) {
             return ResponseEntity.badRequest().body("Old password is incorrect");
@@ -78,12 +109,12 @@ public class AuthController {
         user.setPassword(passwordEncoder.encode(req.getNewPassword()));
         userRepository.save(user);
 
-        return ResponseEntity.ok(" Password updated successfully");
+        return ResponseEntity.ok("Password updated successfully");
     }
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout() {
-        return ResponseEntity.ok(" Logged out successfully (client should remove token)");
+        return ResponseEntity.ok("Logged out successfully (client should remove token)");
     }
 }
 
@@ -93,6 +124,7 @@ public class AuthController {
 class AuthRequest {
     private String username;
     private String password;
+    private String roleName;
 }
 
 @Data
@@ -103,11 +135,11 @@ class AuthResponse {
     private String username;
     private String role;
 }
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 class ResetPasswordRequest {
-    private String username;
     private String oldPassword;
     private String newPassword;
 }
