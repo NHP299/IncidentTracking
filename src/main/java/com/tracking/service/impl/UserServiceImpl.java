@@ -3,7 +3,9 @@ package com.tracking.service.impl;
 import com.tracking.domain.Department;
 import com.tracking.domain.Role;
 import com.tracking.domain.User;
+import com.tracking.dto.ChangePasswordRequest;
 import com.tracking.dto.UserDTO;
+import com.tracking.security.JwtService;
 import com.tracking.mapper.UserMapper;
 import com.tracking.repository.DepartmentRepository;
 import com.tracking.repository.RoleRepository;
@@ -11,6 +13,7 @@ import com.tracking.repository.UserRepository;
 import com.tracking.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,6 +26,9 @@ public class UserServiceImpl implements UserService {
     private final DepartmentRepository departmentRepository;
     private final RoleRepository roleRepository;
     private final UserMapper userMapper;
+    private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
+
 
     @Override
     public List<UserDTO> getAllUsers() {
@@ -99,5 +105,32 @@ public class UserServiceImpl implements UserService {
         if (userRepository.count() == 0) {
             userRepository.resetIdentity();
         }
+    }
+    @Override
+    public void changePassword(String authHeader, ChangePasswordRequest req) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Invalid Authorization header");
+        }
+
+        String token = authHeader.substring(7);
+        String username = jwtService.extractUsername(token);
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!passwordEncoder.matches(req.getOldPassword(), user.getPassword())) {
+            throw new RuntimeException("Old password is incorrect");
+        }
+
+        if (!req.getNewPassword().equals(req.getConfirmPassword())) {
+            throw new RuntimeException("Password not match");
+        }
+
+        user.setPassword(passwordEncoder.encode(req.getNewPassword()));
+        user.setActiveToken(null);
+        user.setTokenExpiredAt(null);
+
+        userRepository.save(user);
     }
 }

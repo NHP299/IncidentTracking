@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -68,4 +69,9 @@ public class User {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+    @Column(length = 500)
+    private String activeToken;
+
+    private Date tokenExpiredAt;
+
 }

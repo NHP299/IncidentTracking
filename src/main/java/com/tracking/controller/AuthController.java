@@ -4,18 +4,17 @@ import com.tracking.domain.Role;
 import com.tracking.domain.User;
 import com.tracking.repository.RoleRepository;
 import com.tracking.repository.UserRepository;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
+import com.tracking.security.JwtService;
+import com.tracking.service.MailService;
+import com.tracking.service.OtpService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import lombok.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-
-import java.nio.charset.StandardCharsets;
-import java.security.Key;
 import java.util.*;
 
 @RestController
@@ -25,13 +24,13 @@ public class AuthController {
     @Autowired private UserRepository userRepository;
     @Autowired private RoleRepository roleRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private JwtService jwtService;
+    @Autowired private MailService mailService;
+    @Autowired private OtpService otpService;
 
     private final String SECRET_KEY = "your-256-bit-secret-your-256-bit-secret"; // >=32 ký tự
     private final long EXPIRATION_MS = 3600000; // 1 giờ
 
-    private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
-    }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody AuthRequest request) {
@@ -55,69 +54,110 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
+
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Invalid credentials");
         }
 
-        String role = user.getRole() != null ? user.getRole().getRoleName() : "USER";
+        if (user.getTokenExpiredAt() != null
+                && user.getTokenExpiredAt().after(new Date())) {
 
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("roles", Collections.singletonList(role));
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body("Yours longed. Please logout and login again.");
+        }
 
-        String token = Jwts.builder()
-                .setClaims(claims)
-                .setSubject(user.getUsername())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
+        String role = user.getRole() != null
+                ? user.getRole().getRoleName()
+                : "USER";
 
-        AuthResponse response = new AuthResponse(token, user.getUsername(), role);
-        return ResponseEntity.ok(response);
+        String token = jwtService.generateToken(
+                user.getUsername(),
+                role
+        );
+
+        Date expiredAt = jwtService.extractExpiration(token);
+
+        user.setActiveToken(token);
+        user.setTokenExpiredAt(expiredAt);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(
+                new AuthResponse(token, user.getUsername(), role)
+        );
     }
 
-    @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest req,
-                                           @RequestHeader("Authorization") String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token");
-        }
-
-        String token = authHeader.substring(7);
-        String username;
-        try {
-            username = Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody()
-                    .getSubject();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
-        }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> req) {
+        String username = req.get("username");
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!passwordEncoder.matches(req.getOldPassword(), user.getPassword())) {
-            return ResponseEntity.badRequest().body("Old password is incorrect");
+        String otp = otpService.generateOtp(username);
+        mailService.sendOtp(user.getUsername(), otp);
+
+        return ResponseEntity.ok("OTP sent to email");
+    }
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(
+            @RequestBody Map<String, String> req
+    ) {
+        String otpToken = req.get("otp");
+        String newPassword = req.get("newPassword");
+
+        try {
+            Claims claims = jwtService.verifyOtp(otpToken);
+
+            String username = claims.getSubject();
+
+            User user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            user.setPassword(passwordEncoder.encode(newPassword));
+            userRepository.save(user);
+
+            return ResponseEntity.ok("Password reset successfully");
+
+        } catch (ExpiredJwtException e) {
+            return ResponseEntity.badRequest().body("OTP expired");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid OTP");
         }
-
-        user.setPassword(passwordEncoder.encode(req.getNewPassword()));
-        userRepository.save(user);
-
-        return ResponseEntity.ok("Password updated successfully");
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
-        return ResponseEntity.ok("Logged out successfully (client should remove token)");
+    public ResponseEntity<?> logout(
+            @RequestHeader(value = "Authorization", required = false) String authHeader
+    ) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.ok("Logged out"); // 👈 KHÔNG trả 401
+        }
+
+        String token = authHeader.substring(7);
+
+        try {
+            Claims claims = jwtService.extractAllClaimsIgnoreExpiration(token);
+            String username = claims.getSubject();
+
+            userRepository.findByUsername(username).ifPresent(user -> {
+                user.setActiveToken(null);
+                user.setTokenExpiredAt(null);
+                userRepository.save(user);
+            });
+
+        } catch (Exception ignored) {
+            System.out.println("Invalid token.");
+        }
+
+        return ResponseEntity.ok("Logged out successfully");
     }
 }
-
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -136,10 +176,3 @@ class AuthResponse {
     private String role;
 }
 
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-class ResetPasswordRequest {
-    private String oldPassword;
-    private String newPassword;
-}

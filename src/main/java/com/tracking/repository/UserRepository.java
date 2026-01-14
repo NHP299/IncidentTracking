@@ -13,9 +13,18 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
+
+    @Query("""
+        select u from User u
+        join fetch u.role
+        where u.username = :username
+    """)
     Optional<User> findByUsername(String username);
+
     Optional<User> findByEmail(String email);
+
     boolean existsByUsername(String username);
+
     @Modifying
     @Transactional
     @Query(value = "DBCC CHECKIDENT ('users', RESEED, 0)", nativeQuery = true)

@@ -1,8 +1,9 @@
 package  com.tracking.controller.admin;
 
-import lombok.RequiredArgsConstructor;
 import  com.tracking.dto.UserDTO;
 import  com.tracking.service.UserService;
+import com.tracking.dto.ChangePasswordRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,7 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin/users")
 public class UserController {
-
+    @Autowired
     private final UserService userService;
 
     public UserController(UserService userService) {
@@ -43,6 +44,14 @@ public class UserController {
     public ResponseEntity<Void> deleteUser(@PathVariable Integer id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
+    }
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody ChangePasswordRequest req
+    ) {
+        userService.changePassword(authHeader, req);
+        return ResponseEntity.ok("Password changed successfully. Please login again.");
     }
 }
 
