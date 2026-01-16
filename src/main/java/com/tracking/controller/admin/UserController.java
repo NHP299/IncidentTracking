@@ -47,10 +47,9 @@ public class UserController {
     }
     @PutMapping("/change-password")
     public ResponseEntity<?> changePassword(
-            @RequestHeader("Authorization") String authHeader,
             @RequestBody ChangePasswordRequest req
     ) {
-        userService.changePassword(authHeader, req);
+        userService.changePassword(req);
         return ResponseEntity.ok("Password changed successfully. Please login again.");
     }
 }

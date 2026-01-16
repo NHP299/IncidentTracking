@@ -31,8 +31,6 @@ public class OtpServiceImpl implements OtpService {
 
     @Override
     public String generateOtp(String username) {
-
-        // 🔒 Chống spam: nếu đang lock → không cho gửi
         Boolean locked = redisTemplate.hasKey(lockKey(username));
         if (Boolean.TRUE.equals(locked)) {
             throw new RuntimeException("OTP already sent. Please wait 60 seconds.");

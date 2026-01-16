@@ -47,7 +47,9 @@ public class AuthController {
         newUser.setUsername(request.getUsername());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
         newUser.setRole(role);
-
+        newUser.setEmail(request.getEmail());
+        newUser.setPhone(request.getPhone());
+        newUser.setFullName(request.getFullName());
         userRepository.save(newUser);
         return ResponseEntity.ok("User registered successfully with role " + roleName);
     }
@@ -69,7 +71,7 @@ public class AuthController {
 
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
-                    .body("Yours longed. Please logout and login again.");
+                    .body("You are already logged in. Please logout and login again.");
         }
 
         String role = user.getRole() != null
@@ -100,8 +102,10 @@ public class AuthController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         String otp = otpService.generateOtp(username);
-        mailService.sendOtp(user.getUsername(), otp);
-
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            return ResponseEntity.badRequest().body("User has no email");
+        }
+        mailService.sendOtp(user.getEmail(), otp);
         return ResponseEntity.ok("OTP sent to email");
     }
     @PostMapping("/reset-password")
@@ -165,6 +169,9 @@ class AuthRequest {
     private String username;
     private String password;
     private String roleName;
+    private String email;
+    private String phone;
+    private String fullName;
 }
 
 @Data

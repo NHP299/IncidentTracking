@@ -10,5 +10,5 @@ public interface UserService {
     UserDTO createUser(UserDTO userDTO);
     UserDTO updateUser(Integer id, UserDTO userDTO);
     void deleteUser(Integer id);
-    void changePassword(String authHeader, ChangePasswordRequest req);
+    void changePassword(ChangePasswordRequest req);
 }

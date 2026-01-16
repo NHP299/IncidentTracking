@@ -35,15 +35,6 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/register", "/api/auth/login", "/uploads/**").permitAll()
-                        .requestMatchers("/api/auth/logout").authenticated()
-                        .requestMatchers("/api/staff/**").hasRole("STAFF")
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/users/**").hasAnyRole("USER", "ADMIN", "STAFF")
-                        .requestMatchers("/api/admin/users/change-password").authenticated()
-                        .anyRequest().authenticated()
-                )
                 .sessionManagement(sess ->
                         sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
@@ -52,13 +43,28 @@ public class SecurityConfig {
                                 new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)
                         )
                 )
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/forgot-password/**",
+                                "/api/auth/reset-password/**",
+                                "/uploads/**"
+                        ).permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/staff/**").hasRole("STAFF")
+                        .requestMatchers("/users/**").hasAnyRole("USER", "ADMIN", "STAFF")
+                        .anyRequest().authenticated()
+                )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config
+    ) throws Exception {
         return config.getAuthenticationManager();
     }
 
@@ -70,7 +76,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*")); // Adjust as needed
+        configuration.setAllowedOrigins(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
